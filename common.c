@@ -12,7 +12,7 @@ void printf(const char *fmt, ...) {
       switch (*fmt) {
         case '\0':
           putchar('%');
-          break;
+          goto end;
         case '%':
           putchar('%');
           break;
