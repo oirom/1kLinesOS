@@ -2,6 +2,8 @@
 #include "common.h"
 
 struct process procs[PROCS_MAX];
+struct process *current_proc;
+struct process *idle_proc;
 
 struct process *create_process(uint32_t pc) {
   struct process *proc = NULL;
@@ -72,6 +74,24 @@ __attribute__((naked)) void switch_context(uint32_t *prev_sp,
     "addi sp, sp, 13 * 4\n"
     "ret\n"
   );
+}
+
+void yeild(void) {
+  struct process *next = idle_proc;
+  for (int i = 0; i < PROCS_MAX; i++) {
+    struct process *proc = &procs[(current_proc->pid + i) % PROCS_MAX];
+    if (proc->state == PROC_RUNNABLE && proc->pid > 0) {
+      next = proc;
+      break;
+    }
+  }
+
+  if (next == current_proc)
+    return;
+
+  struct process *prev = current_proc;
+  current_proc = next;
+  switch_context(&prev->sp, &next->sp);
 }
 
 extern char __free_ram[], __free_ram_end[];
@@ -206,7 +226,7 @@ void proc_a_entry(void) {
   printf("starting process A\n");
   while (1) {
     putchar('A');
-    switch_context(&proc_a->sp, &proc_b->sp);
+    yeild();
 
     for (int i = 0; i < 30000000; i++)
       __asm__ __volatile__("nop");
@@ -217,7 +237,7 @@ void proc_b_entry(void) {
   printf("starting process B\n");
   while (1) {
     putchar('B');
-    switch_context(&proc_b->sp, &proc_a->sp);
+    yeild();
 
     for (int i = 0; i < 30000000; i++)
       __asm__ __volatile__("nop");
@@ -241,9 +261,15 @@ void kernel_main(void) {
   printf("alloc_pages test: paddr0=%x\n", paddr0);
   printf("alloc_pages test: paddr1=%x\n", paddr1);
 
+  idle_proc = create_process((uint32_t) NULL);
+  idle_proc->pid = -1;
+  current_proc = idle_proc;
+
   proc_a = create_process((uint32_t) proc_a_entry);
   proc_b = create_process((uint32_t) proc_b_entry);
-  proc_a_entry();
+
+  yeild();
+  PANIC("switched to idle process");
 
   for (;;) {
     __asm__ __volatile__("wfi");
