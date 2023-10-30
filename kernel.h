@@ -1,12 +1,27 @@
 #pragma once
-
 #include "common.h"
 
-#define PANIC(fmt, ...)\
-  do {\
-    printf("PANIC: %s:%d " fmt "\n", __FILE__, __LINE__, ##__VA_ARGS__);\
-    while (1) {}\
-  } while (0)\
+#define PROCS_MAX     8
+#define PROC_UNUSED   0
+#define PROC_RUNNABLE 1
+#define SATP_SV32 (1u << 31)
+#define PAGE_V    (1 << 0)   // 有効化ビット
+#define PAGE_R    (1 << 1)   // 読み込み可能
+#define PAGE_W    (1 << 2)   // 書き込み可能
+#define PAGE_X    (1 << 3)   // 実行可能
+#define PAGE_U    (1 << 4)   // ユーザーモードでアクセス可能
+
+struct process {
+  int pid;
+  int state;
+  vaddr_t sp;
+  uint8_t stack[8192];
+};
+
+struct sbiret {
+  long error;
+  long value;
+};
 
 struct trap_frame {
     uint32_t ra;
@@ -55,18 +70,8 @@ struct trap_frame {
         __asm__ __volatile__("csrw " #reg ", %0" ::"r"(__tmp));\
     } while (0)
 
-struct sbiret {
-  long error;
-  long value;
-};
-
-#define PROCS_MAX     8
-#define PROC_UNUSED   0
-#define PROC_RUNNABLE 1
-
-struct process {
-  int pid;
-  int state;
-  vaddr_t sp;
-  uint8_t stack[8192];
-};
+#define PANIC(fmt, ...)\
+  do {\
+    printf("PANIC: %s:%d " fmt "\n", __FILE__, __LINE__, ##__VA_ARGS__);\
+    while (1) {}\
+  } while (0)\
